@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#F5F3EF" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="隨身擴音器" />
+  <title>隨身擴音器 · VoiceAmp</title>
+
+  <!-- 載入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- 載入 Google Fonts: Noto Sans TC & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <!-- 動態產生 PWA Web App Manifest -->
+  <link rel="manifest" id="pwa-manifest" />
+
+  <style>
+    :root {
+      --bg-warm: #F5F3EF;
+      --card-surface: #FFFFFF;
+      --ink-charcoal: #1E1E1E;
+      --ink-muted: #5C5B57;
+      --accent-sage: #4A6B5D;
+      --accent-sage-light: #E6EDE9;
+      --accent-amber: #C96A2B;
+      --accent-amber-bg: #FDF3EC;
+      --border-subtle: #E2DFD7;
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-warm);
+      color: var(--ink-charcoal);
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* 自訂高對比大尺寸滑桿 (Range Slider) */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 14px;
+      background: #E2DFD7;
+      border-radius: 999px;
+      outline: none;
+      transition: background 0.2s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--ink-charcoal);
+      border: 4px solid #FFFFFF;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+      cursor: pointer;
+      transition: transform 0.15s ease, background-color 0.2s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:active {
+      transform: scale(1.12);
+      background: var(--accent-sage);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--ink-charcoal);
+      border: 4px solid #FFFFFF;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+      cursor: pointer;
+    }
+
+    /* 電源按鈕脈衝光暈動畫 */
+    @keyframes pulse-ring {
+      0% {
+        transform: scale(0.96);
+        opacity: 0.55;
+      }
+      70% {
+        transform: scale(1.14);
+        opacity: 0;
+      }
+      100% {
+        transform: scale(1.14);
+        opacity: 0;
+      }
+    }
+
+    .animate-pulse-ring {
+      animation: pulse-ring 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+    }
+
+    /* 平滑切換開關 */
+    .toggle-checkbox:checked {
+      right: 0;
+      border-color: var(--accent-sage);
+    }
+    .toggle-checkbox:checked + .toggle-label {
+      background-color: var(--accent-sage);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased">
+
+  <!-- 頂部導覽列 -->
+  <header class="w-full max-w-lg mx-auto px-5 pt-5 pb-2 flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-xl bg-[#1E1E1E] text-[#F5F3EF] flex items-center justify-center shadow-sm">
+        <!-- 擴音器 SVG 圖示 -->
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m3 11 18-5v12L3 14v-3z"/>
+          <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight text-[#1E1E1E] leading-none">隨身擴音器</h1>
+        <p class="text-xs text-[#5C5B57] mt-0.5">清晰人聲助聽輔助</p>
+      </div>
+    </div>
+
+    <!-- 安裝 / 桌面捷徑說明按鈕 -->
+    <button id="btn-install-guide" type="button" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#E2DFD7] text-xs font-semibold text-[#1E1E1E] shadow-xs active:scale-95 transition">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-[#4A6B5D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      <span>安裝 App</span>
+    </button>
+  </header>
+
+  <!-- 主要內容區塊 -->
+  <main class="w-full max-w-lg mx-auto px-5 py-3 flex-1 flex flex-col gap-4">
+
+    <!-- 防嘯叫（回授）提醒橫幅 -->
+    <div id="feedback-banner" class="rounded-2xl bg-[#FDF3EC] border border-[#F2D5C0] px-4 py-3 flex items-start gap-3 transition-all">
+      <div class="mt-0.5 text-[#C96A2B] shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <div class="text-xs leading-relaxed text-[#6E3612]">
+        <strong class="font-bold text-[#9A4915]">防嘯叫提醒：</strong>請佩戴<span class="underline decoration-[#C96A2B]/50 font-semibold">有線或藍牙耳機</span>，或讓手機麥克風與喇叭保持距離，避免聲音循環產生尖銳回授聲。
+      </div>
+    </div>
+
+    <!-- 狀態與即時音訊波形顯示區 -->
+    <section class="rounded-3xl bg-white border border-[#E2DFD7] p-5 shadow-xs flex flex-col items-center justify-between relative overflow-hidden">
+      <!-- 狀態徽章 -->
+      <div class="w-full flex items-center justify-between mb-3">
+        <span id="status-badge" class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[#F5F3EF] text-[#5C5B57]">
+          <span id="status-dot" class="w-2 h-2 rounded-full bg-[#9E9C96]"></span>
+          <span id="status-text">待機中 · 點擊下方按鈕開始</span>
+        </span>
+        <span id="db-readout" class="text-xs font-mono font-semibold text-[#5C5B57]">-- dB</span>
+      </div>
+
+      <!-- 即時音波 Visualizer Canvas -->
+      <div class="w-full h-20 rounded-2xl bg-[#F5F3EF] border border-[#E2DFD7]/70 overflow-hidden flex items-center justify-center mb-5 relative">
+        <canvas id="visualizer" class="w-full h-full block"></canvas>
+        <div id="visualizer-placeholder" class="absolute inset-0 flex items-center justify-center text-xs text-[#8C8A84] pointer-events-none">
+          麥克風音訊波形顯示區
+        </div>
+      </div>
+
+      <!-- 超大觸控電源開關按鈕 -->
+      <div class="relative flex items-center justify-center my-1">
+        <div id="power-pulse" class="hidden absolute inset-0 rounded-full bg-[#4A6B5D] animate-pulse-ring"></div>
+        <button id="btn-power" type="button" aria-label="開啟或關閉擴音器"
+          class="relative z-10 w-36 h-36 rounded-full bg-[#1E1E1E] text-[#F5F3EF] shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all duration-200 active:scale-95 focus:outline-none">
+          <svg id="icon-mic" xmlns="http://www.w3.org/2000/svg" class="w-11 h-11 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+          </svg>
+          <span id="power-label" class="text-base font-bold tracking-wide">開始擴音</span>
+        </button>
+      </div>
+
+      <!-- 動態壓縮保護提示 -->
+      <p class="text-[11px] text-[#7A7872] mt-4 text-center">
+        內建動態音量保護（Limiter），自動防止突發爆音傷耳
+      </p>
+    </section>
+
+    <!-- 擴音倍率控制卡片 -->
+    <section class="rounded-3xl bg-white border border-[#E2DFD7] p-5 shadow-xs">
+      <div class="flex items-baseline justify-between mb-3">
+        <div>
+          <label for="gain-slider" class="text-base font-bold text-[#1E1E1E]">擴音音量倍率</label>
+          <p class="text-xs text-[#5C5B57] mt-0.5">建議從 1.5x 開始逐步調高</p>
+        </div>
+        <div class="px-3.5 py-1.5 rounded-xl bg-[#F5F3EF] border border-[#E2DFD7] text-xl font-bold tabular-nums text-[#1E1E1E]">
+          <span id="gain-value">2.0</span><span class="text-sm font-semibold ml-0.5 text-[#5C5B57]">x</span>
+        </div>
+      </div>
+
+      <div class="py-2">
+        <input id="gain-slider" type="range" min="1.0" max="5.0" step="0.1" value="2.0" />
+      </div>
+
+      <div class="flex justify-between text-[11px] font-medium text-[#7A7872] mt-1 px-1">
+        <span>1.0x 原音</span>
+        <span>2.5x 清晰</span>
+        <span>4.0x 強效</span>
+        <span>5.0x 最大</span>
+      </div>
+    </section>
+
+    <!-- 進階人聲與防干擾開關群組 -->
+    <section class="rounded-3xl bg-white border border-[#E2DFD7] divide-y divide-[#E2DFD7] shadow-xs overflow-hidden">
+      <!-- 1. 人聲清晰增強 (Voice Clarity Filter) -->
+      <div class="p-4 flex items-center justify-between gap-4">
+        <div class="flex items-start gap-3">
+          <div class="w-9 h-9 rounded-xl bg-[#E6EDE9] text-[#4A6B5D] flex items-center justify-center shrink-0 mt-0.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 10v3"/>
+              <path d="M6 6v11"/>
+              <path d="M10 3v18"/>
+              <path d="M14 8v7"/>
+              <path d="M18 5v13"/>
+              <path d="M22 10v3"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-[#1E1E1E]">人聲清晰增強</h2>
+            <p class="text-xs text-[#5C5B57] mt-0.5">過濾環境低頻嗡嗡聲，強化 1kHz–4kHz 語音頻段</p>
+          </div>
+        </div>
+        <button id="toggle-clarity" type="button" role="switch" aria-checked="true"
+          class="w-14 h-8 rounded-full bg-[#4A6B5D] p-1 transition-colors duration-200 shrink-0 focus:outline-none">
+          <span class="block w-6 h-6 rounded-full bg-white shadow-sm transform translate-x-6 transition-transform duration-200"></span>
+        </button>
+      </div>
+
+      <!-- 2. 抗回授與環境降噪 (Hardware AEC / NS) -->
+      <div class="p-4 flex items-center justify-between gap-4">
+        <div class="flex items-start gap-3">
+          <div class="w-9 h-9 rounded-xl bg-[#F5F3EF] text-[#1E1E1E] flex items-center justify-center shrink-0 mt-0.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-[#1E1E1E]">抗回授與降噪保護</h2>
+            <p class="text-xs text-[#5C5B57] mt-0.5">啟用瀏覽器回音消除與背景雜音抑制（切換時將重啟麥克風）</p>
+          </div>
+        </div>
+        <button id="toggle-aec" type="button" role="switch" aria-checked="true"
+          class="w-14 h-8 rounded-full bg-[#4A6B5D] p-1 transition-colors duration-200 shrink-0 focus:outline-none">
+          <span class="block w-6 h-6 rounded-full bg-white shadow-sm transform translate-x-6 transition-transform duration-200"></span>
+        </button>
+      </div>
+
+      <!-- 3. 保持螢幕常亮 (Wake Lock API) -->
+      <div class="p-4 flex items-center justify-between gap-4">
+        <div class="flex items-start gap-3">
+          <div class="w-9 h-9 rounded-xl bg-[#F5F3EF] text-[#1E1E1E] flex items-center justify-center shrink-0 mt-0.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2v2"/>
+              <path d="M12 20v2"/>
+              <path d="m4.93 4.93 1.41 1.41"/>
+              <path d="m17.66 17.66 1.41 1.41"/>
+              <path d="M2 12h2"/>
+              <path d="M20 12h2"/>
+              <path d="m6.34 17.66-1.41 1.41"/>
+              <path d="m19.07 4.93-1.41 1.41"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-[#1E1E1E]">對話時保持螢幕常亮</h2>
+            <p class="text-xs text-[#5C5B57] mt-0.5">防止手機自動休眠導致擴音中斷</p>
+          </div>
+        </div>
+        <button id="toggle-wakelock" type="button" role="switch" aria-checked="true"
+          class="w-14 h-8 rounded-full bg-[#4A6B5D] p-1 transition-colors duration-200 shrink-0 focus:outline-none">
+          <span class="block w-6 h-6 rounded-full bg-white shadow-sm transform translate-x-6 transition-transform duration-200"></span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 錯誤或系統訊息提示框 (取代 alert) -->
+    <div id="toast-message" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md rounded-2xl bg-[#1E1E1E] text-white px-4 py-3.5 text-sm shadow-xl flex items-center justify-between gap-3">
+      <span id="toast-text" class="leading-snug"></span>
+      <button id="toast-close" type="button" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 shrink-0">關閉</button>
+    </div>
+
+  </main>
+
+  <!-- 頁尾說明 -->
+  <footer class="w-full max-w-lg mx-auto px-5 py-4 text-center text-xs text-[#7A7872]">
+    所有音訊僅於本機即時處理，絕不上傳或錄音 · 支援 Chrome 桌面與手機安裝
+  </footer>
+
+  <!-- PWA 安裝與 Chrome 應用程式上架/安裝指引彈窗 -->
+  <div id="install-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-4">
+    <div class="w-full max-w-md rounded-3xl bg-[#F5F3EF] border border-[#E2DFD7] p-6 shadow-2xl text-[#1E1E1E]">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold">安裝至手機桌面 / Chrome 應用</h3>
+        <button id="btn-close-modal" type="button" class="w-8 h-8 rounded-full bg-white border border-[#E2DFD7] flex items-center justify-center text-[#5C5B57] hover:text-[#1E1E1E]">
+          ✕
+        </button>
+      </div>
+
+      <!-- 若瀏覽器支援一鍵 PWA 安裝，顯示此按鈕 -->
+      <div id="native-install-box" class="hidden mb-4">
+        <button id="btn-native-install" type="button" class="w-full py-3.5 px-4 rounded-2xl bg-[#4A6B5D] text-white font-bold text-sm shadow-md active:scale-98 transition">
+          立即安裝「隨身擴音器」應用程式
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs leading-relaxed text-[#3D3C38]">
+        <div class="p-3.5 rounded-2xl bg-white border border-[#E2DFD7]">
+          <p class="font-bold text-[#1E1E1E] mb-1">📱 Android / Chrome 手機版：</p>
+          <p>點擊瀏覽器右上角 <span class="font-bold">「⋮」選單</span> → 選擇 <span class="font-bold">「加到主畫面」</span> 或 <span class="font-bold">「安裝應用程式」</span>，即可像原生 App 一樣全螢幕開啟。</p>
+        </div>
+
+        <div class="p-3.5 rounded-2xl bg-white border border-[#E2DFD7]">
+          <p class="font-bold text-[#1E1E1E] mb-1">🍎 iPhone / iPad (Safari)：</p>
+          <p>點擊底部中央 <span class="font-bold">「分享」圖示</span> → 往下滑動並選擇 <span class="font-bold">「加入主畫面」</span>。</p>
+        </div>
+
+        <div class="p-3.5 rounded-2xl bg-white border border-[#E2DFD7]">
+          <p class="font-bold text-[#1E1E1E] mb-1">💻 電腦版 Chrome / 上架部署：</p>
+          <p>點擊網址列右側的 <span class="font-bold">「安裝」圖示</span> 即可獨立視窗運行。若要上架至 Google Play 或 Chrome 生態系，只需將此單一 HTML 檔案託管於任何 HTTPS 網址（如 GitHub Pages / Vercel），即可透過 PWABuilder 打包上架。</p>
+        </div>
+      </div>
+
+      <button id="btn-modal-done" type="button" class="mt-5 w-full py-3 rounded-2xl bg-[#1E1E1E] text-white text-sm font-bold">
+        我知道了
+      </button>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * 1. PWA Manifest 與 Service Worker 動態註冊
+     * 讓單一 HTML 檔案也能具備完整的 PWA 安裝條件
+     */
+    (function setupPWA() {
+      const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#1E1E1E"/><path d="M128 224l256-72v208l-256-72v-64z" fill="none" stroke="#F5F3EF" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/><path d="M236 332a48 48 0 1 1-92-26" fill="none" stroke="#4A6B5D" stroke-width="32" stroke-linecap="round"/></svg>`;
+      const iconUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(iconSvg);
+
+      const manifest = {
+        name: '隨身擴音器 VoiceAmp',
+        short_name: '隨身擴音器',
+        description: '極簡高對比隨身麥克風擴音與人聲清晰輔助工具',
+        start_url: location.href,
+        display: 'standalone',
+        background_color: '#F5F3EF',
+        theme_color: '#F5F3EF',
+        orientation: 'portrait',
+        icons: [
+          {
+            src: iconUrl,
+            sizes: '192x192',
+            type: 'image/svg+xml',
+            purpose: 'any maskable'
+          },
+          {
+            src: iconUrl,
+            sizes: '512x512',
+            type: 'image/svg+xml',
+            purpose: 'any maskable'
+          }
+        ]
+      };
+
+      const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+      const manifestURL = URL.createObjectURL(manifestBlob);
+      document.getElementById('pwa-manifest').setAttribute('href', manifestURL);
+
+      // 嘗試註冊內嵌 Service Worker（需在 HTTPS 或 localhost 環境下生效）
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        const swCode = `
+          self.addEventListener('install', (e) => self.skipWaiting());
+          self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+          self.addEventListener('fetch', (e) => {
+            e.respondWith(fetch(e.request).catch(() => new Response('離線模式')));
+          });
+        `;
+        const swBlob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swUrl).catch(() => {
+          // 忽略在特殊沙盒環境下的註冊限制
+        });
+      }
+    })();
+
+    /**
+     * 2. 核心狀態與 DOM 元素參照
+     */
+    const state = {
+      isRunning: false,
+      gain: 2.0,
+      voiceClarity: true,
+      antiFeedback: true,
+      keepAwake: true,
+      audioCtx: null,
+      mediaStream: null,
+      sourceNode: null,
+      highPassFilter: null,
+      presenceFilter: null,
+      gainNode: null,
+      compressorNode: null,
+      analyserNode: null,
+      animationId: null,
+      wakeLock: null,
+      deferredPrompt: null
+    };
+
+    const el = {
+      btnPower: document.getElementById('btn-power'),
+      powerLabel: document.getElementById('power-label'),
+      powerPulse: document.getElementById('power-pulse'),
+      statusBadge: document.getElementById('status-badge'),
+      statusDot: document.getElementById('status-dot'),
+      statusText: document.getElementById('status-text'),
+      dbReadout: document.getElementById('db-readout'),
+      gainSlider: document.getElementById('gain-slider'),
+      gainValue: document.getElementById('gain-value'),
+      toggleClarity: document.getElementById('toggle-clarity'),
+      toggleAec: document.getElementById('toggle-aec'),
+      toggleWakelock: document.getElementById('toggle-wakelock'),
+      canvas: document.getElementById('visualizer'),
+      canvasPlaceholder: document.getElementById('visualizer-placeholder'),
+      toast: document.getElementById('toast-message'),
+      toastText: document.getElementById('toast-text'),
+      toastClose: document.getElementById('toast-close'),
+      btnInstallGuide: document.getElementById('btn-install-guide'),
+      installModal: document.getElementById('install-modal'),
+      btnCloseModal: document.getElementById('btn-close-modal'),
+      btnModalDone: document.getElementById('btn-modal-done'),
+      nativeInstallBox: document.getElementById('native-install-box'),
+      btnNativeInstall: document.getElementById('btn-native-install')
+    };
+
+    /**
+     * 3. 提示訊息工具 (不使用 alert)
+     */
+    let toastTimer = null;
+    function showToast(msg, duration = 5000) {
+      el.toastText.textContent = msg;
+      el.toast.classList.remove('hidden');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        el.toast.classList.add('hidden');
+      }, duration);
+    }
+
+    el.toastClose.addEventListener('click', () => {
+      el.toast.classList.add('hidden');
+    });
+
+    /**
+     * 4. Wake Lock 螢幕常亮控制
+     */
+    async function updateWakeLock() {
+      if (!('wakeLock' in navigator)) return;
+
+      if (state.isRunning && state.keepAwake) {
+        try {
+          if (!state.wakeLock) {
+            state.wakeLock = await navigator.wakeLock.request('screen');
+            state.wakeLock.addEventListener('release', () => {
+              state.wakeLock = null;
+            });
+          }
+        } catch (err) {
+          console.warn('WakeLock 請求失敗:', err);
+        }
+      } else if (state.wakeLock) {
+        try {
+          await state.wakeLock.release();
+          state.wakeLock = null;
+        } catch (err) {
+          console.warn('WakeLock 釋放失敗:', err);
+        }
+      }
+    }
+
+    // 頁面重新回到前景時重新申請螢幕常亮
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && state.isRunning && state.keepAwake) {
+        updateWakeLock();
+      }
+    });
+
+    /**
+     * 5. Web Audio API 即時擴音與濾波管線
+     */
+    async function startAmplifier() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showToast('您的瀏覽器不支援麥克風擷取，請使用最新版 Chrome 或 Safari，並確保網址為 HTTPS。');
+          return;
+        }
+
+        // 麥克風音訊限制條件（硬體級抗回授與降噪）
+        const constraints = {
+          audio: {
+            echoCancellation: state.antiFeedback,
+            noiseSuppression: state.antiFeedback,
+            autoGainControl: false, // 關閉瀏覽器自動增益，改由我們的手動滑桿精準控制
+            latency: 0.01 // 盡可能降低延遲
+          },
+          video: false
+        };
+
+        state.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        state.audioCtx = new AudioContextClass({ latencyHint: 'interactive' });
+
+        if (state.audioCtx.state === 'suspended') {
+          await state.audioCtx.resume();
+        }
+
+        // 建立音訊節點
+        state.sourceNode = state.audioCtx.createMediaStreamSource(state.mediaStream);
+
+        // 節點 A: 高通濾波器 (High-pass Filter) - 濾除 140Hz 以下冷氣、風聲、低頻轟鳴
+        state.highPassFilter = state.audioCtx.createBiquadFilter();
+        state.highPassFilter.type = 'highpass';
+        state.highPassFilter.frequency.value = state.voiceClarity ? 140 : 20;
+        state.highPassFilter.Q.value = 0.7;
+
+        // 節點 B: 人聲清晰度峰化濾波器 (Peaking EQ @ 2400Hz) - 提升輔音與咬字清晰度
+        state.presenceFilter = state.audioCtx.createBiquadFilter();
+        state.presenceFilter.type = 'peaking';
+        state.presenceFilter.frequency.value = 2400;
+        state.presenceFilter.Q.value = 1.1;
+        state.presenceFilter.gain.value = state.voiceClarity ? 6.5 : 0;
+
+        // 節點 C: 擴音增益節點 (GainNode)
+        state.gainNode = state.audioCtx.createGain();
+        state.gainNode.gain.value = state.gain;
+
+        // 節點 D: 動態壓縮限制器 (DynamicsCompressorNode) - 防止大聲拍手或嘯叫時爆音
+        state.compressorNode = state.audioCtx.createDynamicsCompressor();
+        state.compressorNode.threshold.value = -10; // 超過 -10dB 開始壓縮
+        state.compressorNode.knee.value = 12;
+        state.compressorNode.ratio.value = 12;
+        state.compressorNode.attack.value = 0.003;
+        state.compressorNode.release.value = 0.15;
+
+        // 節點 E: 視覺化分析器 (AnalyserNode)
+        state.analyserNode = state.audioCtx.createAnalyser();
+        state.analyserNode.fftSize = 256;
+        state.analyserNode.smoothingTimeConstant = 0.8;
+
+        // 串接音訊管線：
+        // Mic -> HighPass -> PresenceEQ -> Gain -> Compressor -> Analyser -> Speaker
+        state.sourceNode.connect(state.highPassFilter);
+        state.highPassFilter.connect(state.presenceFilter);
+        state.presenceFilter.connect(state.gainNode);
+        state.gainNode.connect(state.compressorNode);
+        state.compressorNode.connect(state.analyserNode);
+        state.analyserNode.connect(state.audioCtx.destination);
+
+        state.isRunning = true;
+        updateUIState();
+        updateWakeLock();
+        startVisualizer();
+
+      } catch (err) {
+        console.error('啟動麥克風失敗:', err);
+        let errorMsg = '無法開啟麥克風，請確認已允許瀏覽器使用麥克風權限。';
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          errorMsg = '麥克風權限被拒絕！請點擊網址列左側的圖示，將麥克風設為「允許」。';
+        } else if (err.name === 'NotFoundError') {
+          errorMsg = '找不到可用的麥克風裝置，請檢查耳機或手機麥克風連線。';
+        }
+        showToast(errorMsg, 7000);
+        stopAmplifier();
+      }
+    }
+
+    function stopAmplifier() {
+      state.isRunning = false;
+
+      if (state.animationId) {
+        cancelAnimationFrame(state.animationId);
+        state.animationId = null;
+      }
+
+      if (state.mediaStream) {
+        state.mediaStream.getTracks().forEach(track => track.stop());
+        state.mediaStream = null;
+      }
+
+      if (state.audioCtx) {
+        state.audioCtx.close().catch(() => {});
+        state.audioCtx = null;
+      }
+
+      state.sourceNode = null;
+      state.highPassFilter = null;
+      state.presenceFilter = null;
+      state.gainNode = null;
+      state.compressorNode = null;
+      state.analyserNode = null;
+
+      updateUIState();
+      updateWakeLock();
+      clearCanvas();
+    }
+
+    /**
+     * 6. 更新按鈕、狀態徽章與開關 UI
+     */
+    function updateUIState() {
+      if (state.isRunning) {
+        el.btnPower.classList.remove('bg-[#1E1E1E]');
+        el.btnPower.classList.add('bg-[#4A6B5D]');
+        el.powerLabel.textContent = '擴音中 · 停止';
+        el.powerPulse.classList.remove('hidden');
+
+        el.statusBadge.classList.remove('bg-[#F5F3EF]', 'text-[#5C5B57]');
+        el.statusBadge.classList.add('bg-[#E6EDE9]', 'text-[#2F483E]');
+        el.statusDot.classList.remove('bg-[#9E9C96]');
+        el.statusDot.classList.add('bg-[#4A6B5D]', 'animate-ping');
+        el.statusText.textContent = '即時收音擴音中';
+        el.canvasPlaceholder.classList.add('hidden');
+      } else {
+        el.btnPower.classList.remove('bg-[#4A6B5D]');
+        el.btnPower.classList.add('bg-[#1E1E1E]');
+        el.powerLabel.textContent = '開始擴音';
+        el.powerPulse.classList.add('hidden');
+
+        el.statusBadge.classList.remove('bg-[#E6EDE9]', 'text-[#2F483E]');
+        el.statusBadge.classList.add('bg-[#F5F3EF]', 'text-[#5C5B57]');
+        el.statusDot.classList.remove('bg-[#4A6B5D]', 'animate-ping');
+        el.statusDot.classList.add('bg-[#9E9C96]');
+        el.statusText.textContent = '待機中 · 點擊下方按鈕開始';
+        el.dbReadout.textContent = '-- dB';
+        el.canvasPlaceholder.classList.remove('hidden');
+      }
+    }
+
+    function setSwitchUI(btnElement, isOn) {
+      btnElement.setAttribute('aria-checked', String(isOn));
+      const knob = btnElement.querySelector('span');
+      if (isOn) {
+        btnElement.classList.remove('bg-[#D4D1C8]');
+        btnElement.classList.add('bg-[#4A6B5D]');
+        knob.classList.add('translate-x-6');
+      } else {
+        btnElement.classList.remove('bg-[#4A6B5D]');
+        btnElement.classList.add('bg-[#D4D1C8]');
+        knob.classList.remove('translate-x-6');
+      }
+    }
+
+    /**
+     * 7. 即時音訊波形與音量表繪製 (Canvas)
+     */
+    function resizeCanvas() {
+      const rect = el.canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      el.canvas.width = rect.width * dpr;
+      el.canvas.height = rect.height * dpr;
+      const ctx = el.canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function clearCanvas() {
+      const rect = el.canvas.getBoundingClientRect();
+      const ctx = el.canvas.getContext('2d');
+      ctx.clearRect(0, 0, rect.width, rect.height);
+    }
+
+    function startVisualizer() {
+      if (!state.analyserNode) return;
+      const bufferLength = state.analyserNode.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      const timeArray = new Uint8Array(bufferLength);
+
+      function draw() {
+        if (!state.isRunning || !state.analyserNode) return;
+        state.animationId = requestAnimationFrame(draw);
+
+        state.analyserNode.getByteFrequencyData(dataArray);
+        state.analyserNode.getByteTimeDomainData(timeArray);
+
+        // 計算 RMS 音量分貝近似值
+        let sumSquares = 0;
+        for (let i = 0; i < timeArray.length; i++) {
+          const normalized = (timeArray[i] - 128) / 128;
+          sumSquares += normalized * normalized;
+        }
+        const rms = Math.sqrt(sumSquares / timeArray.length);
+        const db = rms > 0.0001 ? Math.max(-60, Math.round(20 * Math.log10(rms))) : -60;
+        el.dbReadout.textContent = `${db} dB`;
+
+        // 繪製對稱律動音柱
+        const rect = el.canvas.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        const ctx = el.canvas.getContext('2d');
+
+        ctx.clearRect(0, 0, width, height);
+
+        const barCount = 32;
+        const gap = 4;
+        const totalGap = gap * (barCount - 1);
+        const barWidth = Math.max(3, (width - 24 - totalGap) / barCount);
+        const startX = (width - (barCount * barWidth + totalGap)) / 2;
+        const centerY = height / 2;
+
+        for (let i = 0; i < barCount; i++) {
+          // 取人聲主要頻段 (低至中高頻)
+          const freqIndex = Math.floor((i / barCount) * (bufferLength * 0.65));
+          const value = dataArray[freqIndex] / 255;
+          const barHeight = Math.max(6, value * (height * 0.82));
+
+          // 音量過高時轉為暖琥珀色提醒，正常為鼠尾草綠
+          ctx.fillStyle = value > 0.82 ? '#C96A2B' : '#4A6B5D';
+
+          const x = startX + i * (barWidth + gap);
+          const y = centerY - barHeight / 2;
+
+          // 繪製圓角矩形音柱
+          ctx.beginPath();
+          ctx.roundRect(x, y, barWidth, barHeight, 99);
+          ctx.fill();
+        }
+      }
+
+      draw();
+    }
+
+    /**
+     * 8. 事件監聽綁定
+     */
+    // 電源開關
+    el.btnPower.addEventListener('click', () => {
+      if (state.isRunning) {
+        stopAmplifier();
+      } else {
+        startAmplifier();
+      }
+    });
+
+    // 音量倍率滑桿
+    el.gainSlider.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      state.gain = val;
+      el.gainValue.textContent = val.toFixed(1);
+
+      if (state.gainNode && state.audioCtx) {
+        state.gainNode.gain.setTargetAtTime(val, state.audioCtx.currentTime, 0.02);
+      }
+    });
+
+    // 人聲清晰增強開關
+    el.toggleClarity.addEventListener('click', () => {
+      state.voiceClarity = !state.voiceClarity;
+      setSwitchUI(el.toggleClarity, state.voiceClarity);
+
+      if (state.audioCtx && state.highPassFilter && state.presenceFilter) {
+        const now = state.audioCtx.currentTime;
+        state.highPassFilter.frequency.setTargetAtTime(state.voiceClarity ? 140 : 20, now, 0.03);
+        state.presenceFilter.gain.setTargetAtTime(state.voiceClarity ? 6.5 : 0, now, 0.03);
+      }
+      showToast(state.voiceClarity ? '已開啟「人聲清晰增強」：過濾低頻雜音並強化語音' : '已切換為「自然原音模式」', 2500);
+    });
+
+    // 抗回授與降噪開關
+    el.toggleAec.addEventListener('click', async () => {
+      state.antiFeedback = !state.antiFeedback;
+      setSwitchUI(el.toggleAec, state.antiFeedback);
+
+      if (state.isRunning) {
+        stopAmplifier();
+        await startAmplifier();
+      }
+      showToast(state.antiFeedback ? '已開啟瀏覽器抗回授與降噪保護' : '已關閉硬體降噪（音質更直接但請注意回授）', 3000);
+    });
+
+    // 螢幕常亮開關
+    el.toggleWakelock.addEventListener('click', () => {
+      state.keepAwake = !state.keepAwake;
+      setSwitchUI(el.toggleWakelock, state.keepAwake);
+      updateWakeLock();
+      showToast(state.keepAwake ? '擴音期間將保持螢幕常亮' : '已允許螢幕自動休眠', 2500);
+    });
+
+    /**
+     * 9. PWA 安裝提示與說明視窗控制
+     */
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      state.deferredPrompt = e;
+      el.nativeInstallBox.classList.remove('hidden');
+    });
+
+    el.btnNativeInstall.addEventListener('click', async () => {
+      if (!state.deferredPrompt) return;
+      state.deferredPrompt.prompt();
+      const { outcome } = await state.deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        el.nativeInstallBox.classList.add('hidden');
+        el.installModal.classList.add('hidden');
+        showToast('感謝安裝！您現在可以從桌面直接啟動隨身擴音器。');
+      }
+      state.deferredPrompt = null;
+    });
+
+    el.btnInstallGuide.addEventListener('click', () => {
+      el.installModal.classList.remove('hidden');
+    });
+
+    el.btnCloseModal.addEventListener('click', () => {
+      el.installModal.classList.add('hidden');
+    });
+
+    el.btnModalDone.addEventListener('click', () => {
+      el.installModal.classList.add('hidden');
+    });
+
+    el.installModal.addEventListener('click', (e) => {
+      if (e.target === el.installModal) {
+        el.installModal.classList.add('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
